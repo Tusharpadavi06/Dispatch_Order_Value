@@ -1,0 +1,5 @@
+{
+  "name": "Ginza Unit Dispatch & Order Tracker",
+  "description": "Professional data entry dashboard for tracking Order and Dispatch values across 16 industrial units with automated Google Sheets integration and centralized cloud logging.",
+  "requestFramePermissions": []
+}
