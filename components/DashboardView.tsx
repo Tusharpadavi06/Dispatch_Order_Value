@@ -60,8 +60,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ data, onRefresh, i
 
     filteredData.forEach(entry => {
       UNITS.forEach(u => {
-        const order = (entry.units[u]?.orderValue || 0);
-        const dispatch = (entry.units[u]?.dispatchValue || 0);
+        // FIXED: Access data safely. Try new key, then old key, then default empty object.
+        const unitData = entry.units[u] || (entry.units as any)['CIRCULAR KNITTING'] || { orderValue: 0, dispatchValue: 0 };
+        const order = parseFloat(unitData.orderValue.toString()) || 0;
+        const dispatch = parseFloat(unitData.dispatchValue.toString()) || 0;
+        
         unitBreakdown[u].order += order;
         unitBreakdown[u].dispatch += dispatch;
         
@@ -92,12 +95,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ data, onRefresh, i
   const handleEditChange = (unit: UnitKey, field: 'orderValue' | 'dispatchValue', value: number) => {
     if (!editingRecord) return;
     const newUnits = { ...editingRecord.units };
+    
+    // FIXED: Ensure unit object exists before editing
+    if (!newUnits[unit]) {
+      const oldData = (editingRecord.units as any)['CIRCULAR KNITTING'] || { orderValue: 0, dispatchValue: 0 };
+      newUnits[unit] = { ...oldData };
+    }
+    
     newUnits[unit] = { ...newUnits[unit], [field]: value };
 
-    const newTotals = UNITS.reduce((acc, u) => ({
-      order: acc.order + (newUnits[u]?.orderValue || 0),
-      dispatch: acc.dispatch + (newUnits[u]?.dispatchValue || 0)
-    }), { order: 0, dispatch: 0 });
+    const newTotals = UNITS.reduce((acc, u) => {
+      const uData = newUnits[u] || (newUnits as any)['CIRCULAR KNITTING'] || { orderValue: 0, dispatchValue: 0 };
+      return {
+        order: acc.order + (parseFloat(uData.orderValue.toString()) || 0),
+        dispatch: acc.dispatch + (parseFloat(uData.dispatchValue.toString()) || 0)
+      };
+    }, { order: 0, dispatch: 0 });
 
     setEditingRecord({
       ...editingRecord,
@@ -141,33 +154,37 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ data, onRefresh, i
             
             <div className="flex-1 overflow-y-auto p-6 md:p-8">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {UNITS.map(u => (
-                  <div key={u} className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                    <p className="text-[9px] font-black text-slate-900 uppercase tracking-tight mb-3 truncate">{u}</p>
-                    <div className="space-y-3">
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 text-[10px] font-bold">₹</span>
-                        <input 
-                          type="number" 
-                          value={editingRecord.units[u].orderValue || ''}
-                          onChange={(e) => handleEditChange(u, 'orderValue', parseFloat(e.target.value) || 0)}
-                          placeholder="Order"
-                          className="w-full pl-7 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-slate-100"
-                        />
-                      </div>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-rose-200 text-[10px] font-bold">₹</span>
-                        <input 
-                          type="number" 
-                          value={editingRecord.units[u].dispatchValue || ''}
-                          onChange={(e) => handleEditChange(u, 'dispatchValue', parseFloat(e.target.value) || 0)}
-                          placeholder="Dispatch"
-                          className="w-full pl-7 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-[11px] font-bold text-[#E11D48] outline-none focus:ring-2 focus:ring-rose-50"
-                        />
+                {UNITS.map(u => {
+                  // FIXED: Safe data access in Edit Modal
+                  const unitData = editingRecord.units[u] || (editingRecord.units as any)['CIRCULAR KNITTING'] || { orderValue: 0, dispatchValue: 0 };
+                  return (
+                    <div key={u} className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                      <p className="text-[9px] font-black text-slate-900 uppercase tracking-tight mb-3 truncate">{u}</p>
+                      <div className="space-y-3">
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 text-[10px] font-bold">₹</span>
+                          <input 
+                            type="number" 
+                            value={unitData.orderValue || ''}
+                            onChange={(e) => handleEditChange(u, 'orderValue', parseFloat(e.target.value) || 0)}
+                            placeholder="Order"
+                            className="w-full pl-7 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-slate-100"
+                          />
+                        </div>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-rose-200 text-[10px] font-bold">₹</span>
+                          <input 
+                            type="number" 
+                            value={unitData.dispatchValue || ''}
+                            onChange={(e) => handleEditChange(u, 'dispatchValue', parseFloat(e.target.value) || 0)}
+                            placeholder="Dispatch"
+                            className="w-full pl-7 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-[11px] font-bold text-[#E11D48] outline-none focus:ring-2 focus:ring-rose-50"
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
@@ -203,20 +220,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ data, onRefresh, i
         </div>
       </div>
 
-      {/* Facility Wise Mini KPIs Grid */}
+      {/* FIXED: Facility Wise Mini KPIs Grid - 8 CARDS PER ROW */}
       <div className="space-y-4">
         <h3 className="text-[10px] font-black text-slate-900 uppercase tracking-widest px-1">Unit Wise Operational Snapshots</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
           {UNITS.map(u => (
             <div key={u} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm hover:border-slate-300 transition-all group">
-              <p className="text-[8px] font-black text-slate-900 uppercase truncate mb-2 group-hover:text-[#E11D48] transition-colors" title={u}>{u}</p>
-              <div className="space-y-1">
-                <div className="flex justify-between items-center gap-2">
-                  <span className="text-[7px] font-black text-slate-500 uppercase">ORD:</span>
-                  <span className="text-[10px] font-black text-slate-900 whitespace-nowrap">₹{(stats.unitBreakdown[u].order).toLocaleString('en-IN')}</span>
+              <p className="text-[8px] font-black text-slate-900 uppercase truncate mb-3 group-hover:text-[#E11D48] transition-colors" title={u}>{u}</p>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center gap-1">
+                  <span className="text-[8px] font-black text-slate-900 uppercase">ORD:</span>
+                  <span className="text-[10px] font-black text-slate-800 whitespace-nowrap">₹{(stats.unitBreakdown[u].order).toLocaleString('en-IN')}</span>
                 </div>
-                <div className="flex justify-between items-center gap-2 border-t border-slate-50 pt-1">
-                  <span className="text-[7px] font-black text-[#E11D48] uppercase">DISP:</span>
+                <div className="flex justify-between items-center gap-1 border-t border-slate-50 pt-2">
+                  <span className="text-[8px] font-black text-[#E11D48] uppercase">DISP:</span>
                   <span className="text-[10px] font-black text-[#E11D48] whitespace-nowrap">₹{(stats.unitBreakdown[u].dispatch).toLocaleString('en-IN')}</span>
                 </div>
               </div>
@@ -237,9 +254,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ data, onRefresh, i
               
               return (
                 <div key={u} className="flex-1 flex flex-col items-center h-full justify-end group min-w-[85px] relative">
-                  {/* Bars Container */}
                   <div className="flex items-end gap-1.5 md:gap-3 w-full justify-center h-full pb-3 z-0">
-                    {/* Order Bar */}
                     <div 
                       className="relative w-4 md:w-8 bg-slate-900 rounded-t-sm transition-all group-hover:brightness-110 shadow-sm flex justify-center items-start pt-2 overflow-visible" 
                       style={{ height: `${orderH}%` }}
@@ -250,8 +265,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ data, onRefresh, i
                         </span>
                       </div>
                     </div>
-
-                    {/* Dispatch Bar */}
                     <div 
                       className="relative w-4 md:w-8 bg-[#E11D48] rounded-t-sm transition-all group-hover:brightness-110 shadow-sm flex justify-center items-start pt-2 overflow-visible" 
                       style={{ height: `${dispatchH}%` }}
@@ -263,8 +276,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ data, onRefresh, i
                       </div>
                     </div>
                   </div>
-                  
-                  {/* Vertical Facility Name Label */}
                   <div className="absolute inset-x-0 bottom-[-50px] flex justify-center pointer-events-none z-10">
                     <div className="rotate-[-90deg] origin-center transform translate-y-[10px]">
                       <span className="text-slate-700 font-black text-[7px] md:text-[9px] uppercase tracking-tight whitespace-nowrap px-1 py-0.5">
@@ -279,9 +290,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ data, onRefresh, i
         </div>
       </div>
 
-      {/* Operational History Table Section */}
       <div className="space-y-4">
-        {/* Filter Mode */}
         <div className="bg-white p-4 md:p-6 rounded-[1.5rem] border border-slate-200 shadow-sm flex flex-wrap gap-4 items-end">
           <div className="flex flex-col gap-2">
             <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Filter Mode</label>
@@ -296,7 +305,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ data, onRefresh, i
               <option value="year">By Year</option>
             </select>
           </div>
-
           {filters.range === 'day' && (
             <div className="flex flex-col gap-2 animate-fade-in">
               <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Date Selection</label>
@@ -308,7 +316,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ data, onRefresh, i
               />
             </div>
           )}
-
           {filters.range === 'month' && (
             <>
               <div className="flex flex-col gap-2 animate-fade-in">
@@ -333,20 +340,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ data, onRefresh, i
               </div>
             </>
           )}
-
-          {filters.range === 'year' && (
-            <div className="flex flex-col gap-2 animate-fade-in">
-              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Select Year</label>
-              <select 
-                value={filters.selectedYear} 
-                onChange={e => setFilters(f => ({...f, selectedYear: parseInt(e.target.value)}))}
-                className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-[11px] font-bold text-slate-700 outline-none"
-              >
-                {years.map(y => <option key={y} value={y}>{y}</option>)}
-              </select>
-            </div>
-          )}
-
           <div className="ml-auto flex items-center gap-2">
              <button onClick={onRefresh} className="p-2.5 bg-slate-900 text-white rounded-xl hover:bg-[#E11D48] transition-all h-[38px] w-[38px] flex items-center justify-center">
               <i className={`fas fa-sync-alt ${isSyncing ? 'animate-spin' : ''}`}></i>
@@ -354,7 +347,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ data, onRefresh, i
           </div>
         </div>
 
-        {/* Centralized History Table */}
         <div className="bg-white rounded-[1.5rem] md:rounded-[2.5rem] border border-slate-200 shadow-xl overflow-hidden max-h-[800px] flex flex-col">
           <div className="p-6 md:p-8 border-b border-slate-100 flex flex-wrap justify-between items-center bg-slate-50/20 gap-4 shrink-0">
             <h3 className="text-sm md:text-lg font-black text-slate-900 uppercase tracking-tight">Cloud Operational History</h3>
@@ -382,14 +374,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ data, onRefresh, i
                     <td className="py-5 px-8 text-[10px] md:text-[11px] font-black text-slate-900 sticky left-0 bg-white group-hover:bg-slate-50 border-r border-slate-100 shadow-[2px_0_10px_rgba(0,0,0,0.02)] z-10">
                       {formatDate(row.date)}
                     </td>
-                    {UNITS.map(u => (
-                      <td key={u} className="py-5 px-4 text-center border-r border-slate-50">
-                        <div className="flex flex-col items-center">
-                          <span className="text-[10px] font-bold text-slate-900">₹{(row.units[u]?.orderValue || 0).toLocaleString()}</span>
-                          <span className="text-[10px] font-bold text-[#E11D48]">₹{(row.units[u]?.dispatchValue || 0).toLocaleString()}</span>
-                        </div>
-                      </td>
-                    ))}
+                    {UNITS.map(u => {
+                      // FIXED: Safe data access in History Table
+                      const unitVal = row.units[u] || (row.units as any)['CIRCULAR KNITTING'] || { orderValue: 0, dispatchValue: 0 };
+                      return (
+                        <td key={u} className="py-5 px-4 text-center border-r border-slate-50">
+                          <div className="flex flex-col items-center">
+                            <span className="text-[10px] font-bold text-slate-900">₹{(unitVal.orderValue || 0).toLocaleString()}</span>
+                            <span className="text-[10px] font-bold text-[#E11D48]">₹{(unitVal.dispatchValue || 0).toLocaleString()}</span>
+                          </div>
+                        </td>
+                      );
+                    })}
                     <td className="py-5 px-8 text-right text-[11px] font-black bg-slate-50/50">₹{(row.totalOrder || 0).toLocaleString()}</td>
                     <td className="py-5 px-8 text-right text-[11px] font-black text-[#E11D48] bg-slate-50/50">₹{(row.totalDispatch || 0).toLocaleString()}</td>
                     <td className="py-5 px-8 sticky right-0 bg-white group-hover:bg-slate-50 z-10 border-l border-slate-100 shadow-[-2px_0_10px_rgba(0,0,0,0.02)]">
@@ -405,13 +401,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ data, onRefresh, i
                     </td>
                   </tr>
                 ))}
-                {filteredData.length === 0 && (
-                  <tr>
-                    <td colSpan={UNITS.length + 4} className="py-32 text-center text-slate-400 font-black uppercase text-[10px] tracking-[0.5em]">
-                      No centralized entries matching current filters
-                    </td>
-                  </tr>
-                )}
               </tbody>
             </table>
           </div>
